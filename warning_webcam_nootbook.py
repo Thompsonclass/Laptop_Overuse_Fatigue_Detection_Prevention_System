@@ -9,7 +9,7 @@ model1 = YOLO("@@@")
 
 # 평균 얼굴 너비 (cm)
 KNOWN_WIDTH = 15.0
-FOCAL_LENGTH = 600  # 보정된 초점 거리
+FOCAL_LENGTH = 744  # 보정된 초점 거리
 DISTANCE_THRESHOLD = 30  # 경고 거리 기준 (cm)
 
 popup_shown = False  # 팝업 상태 추적용
