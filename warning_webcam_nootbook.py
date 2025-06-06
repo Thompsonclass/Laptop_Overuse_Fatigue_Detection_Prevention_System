@@ -4,11 +4,20 @@ import time
 import tkinter as tk
 from datetime import datetime
 from ultralytics import YOLO
+import os
+
+log_file = "log_test.txt"
+log_interval = 5  # 5초 간격 저장
+last_log_time = 0
+
+# 로그 파일 초기화
+with open(log_file, "w") as f:
+    f.write("시간,깜빡임 수,하품 수,거리 경고 수,피로도 점수\n")
 
 # 설정 
-FOCAL_LENGTH = 744         # 카메라 초점 거리 (픽셀)
-KNOWN_WIDTH = 15.0         # 평균 얼굴 너비 (cm)
-DISTANCE_THRESHOLD = 45    # 경고 기준 거리 (cm)
+FOCAL_LENGTH = 660 # 카메라 초점 거리 (픽셀, 테스트 검증 값)
+KNOWN_WIDTH = 15.0 # 평균 얼굴 너비 (cm)
+DISTANCE_THRESHOLD = 30 # 경고 기준 거리 (cm)
 
 #  상태 변수 
 frame_lock = threading.Lock()
@@ -20,7 +29,7 @@ blink_count = 0
 yawn_count = 0
 warning_count = 0
 start_time = time.time()
-
+MAX_DURATION = 3 * 60 * 60 #3시간
 # debounce
 last_blink_time = 0
 last_yawn_time = 0
@@ -37,7 +46,7 @@ def show_warning_popup():
     root = tk.Tk()
     root.title("경고")
     root.geometry("300x150+600+300")
-    label = tk.Label(root, text=" 너무 가까이 있습니다! (45cm 미만)", font=("Arial", 12), fg="red")
+    label = tk.Label(root, text=" 너무 가까이 있습니다! (30cm 미만)", font=("Arial", 12), fg="red")
     label.pack(pady=20)
 
     def close():
@@ -63,11 +72,11 @@ def capture_thread(cap):
 #  메인 실행 
 def main():
     global running, blink_count, yawn_count, warning_count
-    global last_blink_time, last_yawn_time
+    global last_blink_time, last_yawn_time, last_log_time
 
     # 모델 로딩
-    model_eye = YOLO(r"@@@")
-    model_face = YOLO(r"@@@")
+    model_eye = YOLO("@@@")
+    model_face = YOLO("@@@")
     model_eye.fuse()
     model_face.fuse()
 
@@ -83,6 +92,10 @@ def main():
             if popup_active:
                 time.sleep(0.1)
                 continue
+            
+            if time.time() - start_time >= MAX_DURATION:
+                print("3시간이 지나 자동으로 프로그램을 종료합니다.")
+                break
 
             with frame_lock:
                 if latest_frame is None:
@@ -103,7 +116,7 @@ def main():
                 # 경고 조건
                 if distance_cm < DISTANCE_THRESHOLD and not popup_active:
                     warning_count += 1
-                    show_warning_popup()
+                    threading.Thread(target=show_warning_popup, daemon=True).start()
 
                 # 얼굴 박스
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
@@ -149,6 +162,12 @@ def main():
 
             # 결과 출력
             cv2.imshow("Fatigue Detection", frame)
+            # 주기적으로 로그 저장
+            if time.time() - last_log_time >= log_interval:
+                last_log_time = time.time()
+                with open(log_file, "a") as f:
+                    f.write(f"{now_str},{blink_count},{yawn_count},{warning_count},{fatigue_score}\n")
+
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
